@@ -1,26 +1,31 @@
 name: canary
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
 jobs:
   r:
     runs-on: ubuntu-latest
     steps:
       - name: reach
+        shell: bash
         run: |
           set +e
-          echo "### POSITIVE CONTROL - DNS works at all"
+          echo "### POSITIVE CONTROL - DNS resolves at all"
           getent hosts github.com; echo "  rc=$?"
-          echo "### NEGATIVE CONTROL - invented .github.net host (must NOT resolve)"
+          echo "### NEGATIVE CONTROL - invented .github.net host, MUST NOT resolve"
           getent hosts zzq-definitely-not-real-9184.github.net; echo "  rc=$?"
-          echo "### ARM - vendor-designated canary"
+          echo "### ARM - vendor-designated canary, DNS"
           getent hosts ssrf-target.iad.github.net; echo "  rc=$?"
-          echo "### ARM - HTTP to the canary"
-          curl -sS -m 20 -o /dev/null -w '  canary HTTP:%{http_code} dns:%{time_namelookup}s conn:%{time_connect}s total:%{time_total}s remote:%{remote_ip}
-' http://ssrf-target.iad.github.net/ ; echo "  rc=$?"
+          echo "### ARM - vendor-designated canary, HTTP"
+          curl -sS -m 20 -o /dev/null -w '  canary HTTP:%{http_code} dns:%{time_namelookup} conn:%{time_connect} total:%{time_total} remote:%{remote_ip}\n' http://ssrf-target.iad.github.net/
+          echo "  rc=$?"
           echo "### CONTROL - HTTP to the invented host"
-          curl -sS -m 20 -o /dev/null -w '  invented HTTP:%{http_code} remote:%{remote_ip}
-' http://zzq-definitely-not-real-9184.github.net/ ; echo "  rc=$?"
+          curl -sS -m 20 -o /dev/null -w '  invented HTTP:%{http_code} remote:%{remote_ip}\n' http://zzq-definitely-not-real-9184.github.net/
+          echo "  rc=$?"
           echo "### CONTROL - HTTP to a known-good public host"
-          curl -sS -m 20 -o /dev/null -w '  github.com HTTP:%{http_code} remote:%{remote_ip}
-' https://github.com/ ; echo "  rc=$?"
+          curl -sS -m 20 -o /dev/null -w '  github.com HTTP:%{http_code} remote:%{remote_ip}\n' https://github.com/
+          echo "  rc=$?"
           echo "### runner egress identity"
           curl -sS -m 20 https://api.ipify.org; echo
+          echo "### runner loopback: what listens on this VM (unmeasured per recon)"
+          ss -lntp 2>/dev/null | head -20
